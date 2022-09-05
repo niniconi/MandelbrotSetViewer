@@ -1,0 +1,8 @@
+.vs
+*.exe
+# windows
+*.out
+# linux
+
+
+*.obj
