@@ -7,9 +7,8 @@
 #include <stdlib.h>
 
 #define ACCURACY long double
-
-int width = 100;//指定渲染的像素宽度
-int heigth = 100;//指定渲染的像素高度
+int width = 90;//指定渲染的像素宽度
+int heigth = 90;//指定渲染的像素高度
 
 const unsigned int fps = 60;//画面的帧率
 const char *clear_command = 0;
@@ -222,10 +221,18 @@ void print_set(void){//渲染集合
 	flag = 0;
 	for(int y = heigth - 1;y >= 0;y--){
 		for(int x = 0;x<width;x++){
-			printf("\033[%dm██\033[0m",30+(*arr)[x][y]*10/iterations_number);
+			/* printf("\033[%dm██\033[0m",30+(*arr)[x][y]*10/iterations_number); */
+            int data = ((*arr)[x][y]);
+            int color = (data*0x1000000)/iterations_number;
+            unsigned char r = color&0xff0000 >> 16;
+            unsigned char g = color&0x00ff00 >> 8;
+            unsigned char b = color&0x0000ff;
+            printf("\e[0;38;5;%um██",color);
+            /* printf("\x1b[0;38;2;%d;%d;%dm██",r,g,b); */
 		}
-		printf("\n");
+		putchar('\n');
 	}
+    printf("\033[0m");
 	flag = 1;
 }
 
