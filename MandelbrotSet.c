@@ -222,7 +222,7 @@ void print_set(void){//渲染集合
 	flag = 0;
 	for(int y = heigth - 1;y >= 0;y--){
 		for(int x = 0;x<width;x++){
-			printf("\033[%dm00\033[0m",30+(*arr)[x][y]*10/iterations_number);
+			printf("\033[%dm██\033[0m",30+(*arr)[x][y]*10/iterations_number);
 		}
 		printf("\n");
 	}
