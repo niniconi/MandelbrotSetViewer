@@ -3,14 +3,8 @@
 
 #include <stdio.h>
 
-#ifdef _WIN32
-
-#elif __linux__
-    #include "Linux/thread.h"
-    #include "Linux/listenKey.h"
-#else
-    #error "Unknown Opreating System"
-#endif
+#include "Linux/thread.h"
+#include "Linux/listenKey.h"
 
 #ifdef DEBUG
     #define clean()
