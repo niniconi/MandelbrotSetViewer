@@ -1,17 +1,18 @@
 ﻿/*  
     MandelbrotSet.c
     曼德博集合 实时观测程序
-    version 1.2
+    version 1.3
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include "MandelbrotSet.h"
 
 #define ACCURACY long double
 int width = 90;//指定渲染的像素宽度
 int heigth = 90;//指定渲染的像素高度
 
 const unsigned int fps = 60;//画面的帧率
-const char *clear_command = 0;
 
 ACCURACY real_width = 3;//计算时的默认宽度
 ACCURACY real_heigth = 3;//计算时的默认高度
@@ -22,10 +23,10 @@ ACCURACY postionI = 0;//默认的中心点
 
 int iterations_number = 50;//迭代的次数
 
-unsigned int (*arr)[500][500] = NULL;//存储画面的像素最高[500 x 500]的指针
-unsigned int temp0[500][500];//存储计算的结果
-unsigned int temp1[500][500];//存储计算的结果
-char sign  = 0;//用于标记temp1和temp0那个的数据是已完成的
+unsigned int (*buffer)[500][500] = NULL;//存储画面的像素最高[500 x 500]的指针
+unsigned int buffer0[500][500];//存储计算的结果
+unsigned int buffer1[500][500];//存储计算的结果
+char current_buffer  = 0;//用于标记buffer1和buffer0那个的数据是已完成的
 
 
 struct number{
@@ -45,12 +46,9 @@ void print_info(void);
 void check_progress();//检测完成度
 void init();
 
-int start(const int count,char **args,const char *command){
-#ifdef DEBUG
-	printf("[MandelbrotSet][%s]:start\n",__FUNCTION__);
-#endif
-	*args++;
-	clear_command = command;
+int main(const int count,char **args){
+    debug("MandelbrotSet","start");
+	args++;
 	if(count == 5){
 		iterations_number = atoi(*args++);
 		if (atoi(*args) > 500 || atoi(*args) <= 0){
@@ -78,18 +76,16 @@ int start(const int count,char **args,const char *command){
 
 void init(){
 	init_other_thread(listen_input,check_progress);//初始化监听数据和计算进度的线程
+    clean();
+    hidecur();
 	while(1){
-#ifdef DEBUG
-		printf("--------------------------------DEBUG---------------------------------------------\n");
-#endif
+		debug("sign","--------------------------------DEBUG---------------------------------------------\n");
 
+        restpos();
+		if(buffer != NULL){
 #ifndef DEBUG
-		system(clear_command);
-#endif
-		if(arr != NULL){
-#ifndef DEBUG
-			print_set();
-			print_info();
+            print_set();
+            print_info();
 #endif
 		}
 		pSleep(1000/fps);
@@ -122,19 +118,19 @@ void process(int *args){//将每个点从像素坐标转换为真实对应的复
 			ACCURACY real = (ACCURACY)(x - centerX)*real_width/width+postionR;
 			ACCURACY imag = (ACCURACY)(y - centerY)*real_heigth/heigth+postionI;
 			struct number num = {real,imag,0,0,0};
-			if(sign){
-				temp1[x][y] = iteration(&num);
+			if(current_buffer){
+				buffer1[x][y] = iteration(&num);
 			}else{
-				temp0[x][y] = iteration(&num);
+				buffer0[x][y] = iteration(&num);
 			}
 		}
 	}
 	// lock
 	mutex_thread_lock(LOCK);
 	calculate_progress++;//全局变量完成计算的线程的数量自加一
-#ifdef DEBUG
-	printf("[DEBUG][%s]:Thread OVER\n",__FUNCTION__);
-#endif
+
+    debug("exit","Thread OVER");
+
 	// unlock
 	mutex_thread_lock(UNLOCK);
 	exit_thread();
@@ -151,9 +147,7 @@ target:
 	while(1){
 		ACCURACY temp = real_width+real_heigth;
 		char key = listener_get_char();
-#ifdef DEUBG
-		printf("[DEBUG][%s]:input key %c\n",__FUNCTION__,key);
-#endif
+        debug("input","input key %c",key);
 		switch(key){
 			case 'w':
 				postionI += R;
@@ -179,16 +173,15 @@ target:
 				iterations_number++;
 				break;
 			case 'i':
-				if(iterations_number > 0){
+				if(iterations_number > 1){
 					iterations_number--;
 				}
 				break;
 			case 'q':
 				close_listener();
-#ifndef DEBUG
-				system(clear_command);
-#endif
+                clean();
 				pSleep(10);
+                showcur();
 				exit(EXIT_SUCCESS);
 				break;
 			default:
@@ -202,50 +195,50 @@ void info(void){
 	printf("version v1.2\n");
 	printf("用法：viewer [iteration] [width] [height] [threads]\n");
 	printf("\titeration 指定迭代的次数                          \n");
-	printf("\twidth height 指定渲染的分辨率                范围 width（0,500] height (0.500]\n");
+	printf("\twidth height 指定渲染的分辨率                范围 width（0,500] height (0,500]\n");
 	printf("\tthreads 指定计算使用的线程数量               范围 (0,width] \n");
 }
 
 void print_info(void){
 	printf("=====================================================================================\n");
-	printf("calculate_progress =            %d/%d\n",calculate_progress,thread_count);
-	printf("iteration          =            %d\n",iterations_number);
-	printf("center_postion     =            (%Lf,%Lfi)\n",postionR,postionI);
-	printf("real_size          =            [width = %Lf,height = %Lf]\n",real_width,real_heigth);
+	printf("\e[K calculate_progress =            %d/%d\n",calculate_progress,thread_count);
+	printf("\e[K iteration          =            %d\n",iterations_number);
+	printf("\e[K center_postion     =            (%Lf,%Lfi)\n",postionR,postionI);
+	printf("\e[K real_size          =            [width = %Lf,height = %Lf]\n",real_width,real_heigth);
 	printf("=====================================================================================\n");
 }
 
-
-char flag = 1;//标记当前是否在打印集合的数据
+char print_set_lock = 1;//标记当前是否在打印集合的数据
 void print_set(void){//渲染集合
-	flag = 0;
-	for(int y = heigth - 1;y >= 0;y--){
-		for(int x = 0;x<width;x++){
-			/* printf("\033[%dm██\033[0m",30+(*arr)[x][y]*10/iterations_number); */
-            int data = ((*arr)[x][y]);
-            int color = (data*0x1000000)/iterations_number;
-            unsigned char r = color&0xff0000 >> 16;
-            unsigned char g = color&0x00ff00 >> 8;
-            unsigned char b = color&0x0000ff;
-            printf("\e[0;38;5;%um██",color);
-            /* printf("\x1b[0;38;2;%d;%d;%dm██",r,g,b); */
-		}
-		putchar('\n');
-	}
+	print_set_lock = 0;
+
+    for(int i = heigth/2 - 1;i>=0;i--){
+        for(int j = 0;j<width;j++){
+            int block_bk = ((*buffer)[j][i*2]);
+            int block_bg = ((*buffer)[j][i*2 + 1]);
+            int color_bk = (block_bk*0x1000000)/iterations_number;
+            int color_bg = (block_bg*0x1000000)/iterations_number;
+
+            printf("\e[48;5;%um",color_bk);
+            printf("\e[38;5;%um▀",color_bg);
+
+        }
+        putchar('\n');
+    }
     printf("\033[0m");
-	flag = 1;
+	print_set_lock = 1;
 }
 
 void check_progress(){
 	init_thread(process);
 	while(1){
-		if(calculate_progress == thread_count && flag){
-			if(sign){
-				arr = &temp1;
-				sign = 0;
+		if(calculate_progress == thread_count && print_set_lock){
+			if(current_buffer){
+				buffer = &buffer1;
+				current_buffer = 0;
 			}else{
-				arr = &temp0;
-				sign = 1;
+				buffer = &buffer0;
+				current_buffer = 1;
 			}
 			calculate_progress = 0;
 			init_thread(process);
