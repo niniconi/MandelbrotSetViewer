@@ -228,8 +228,8 @@ void print_info(void){
     printf("=====================================================================================\n");
     printf("\e[K calculate_progress =            %d/%d\n",calculate_progress,thread_count);
     printf("\e[K iteration          =            %d\n",iterations_number);
-    printf("\e[K center_postion     =            (%Lf,%Lfi)\n",positionR,positionI);
-    printf("\e[K real_size          =            [width = %Lf,height = %Lf]\n",real_width,real_heigth);
+    printf("\e[K center_postion     =            (%.32Lf,%.32Lfi)\n",positionR,positionI);
+    printf("\e[K real_size          =            [width = %.32Lf,height = %.32Lf]\n",real_width,real_heigth);
     printf("=====================================================================================\n");
 }
 
